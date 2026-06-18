@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Add Meeting Link{% endblock %}
+
+{% block content %}
+
+<div class="max-w-xl mx-auto mt-16 clay-card p-10 bg-white bg-opacity-40 backdrop-blur-xl">
+
+<h2 class="heading-font text-2xl font-extrabold mb-6">
+Add Meeting Link
+</h2>
+
+<form id="meetingForm" class="space-y-6">
+
+<input
+  name="title"
+  placeholder="Meeting Title"
+  class="clay-inset w-full"
+  required
+/>
+
+<input
+  name="meeting_link"
+  placeholder="Paste Google Meet / Zoom Link"
+  class="clay-inset w-full"
+  required
+/>
+
+<input
+  type="date"
+  name="meeting_date"
+  class="clay-inset w-full"
+/>
+
+<button
+  type="submit"
+  class="clay-button w-full bg-[var(--mint)] font-bold">
+  Add Meeting
+</button>
+
+</form>
+
+</div>
+
+<script>
+document
+.getElementById("meetingForm")
+.addEventListener("submit", async (e) => {
+
+  e.preventDefault();
+
+  const form = e.target;
+
+  const data = {
+    title: form.title.value,
+    meeting_link: form.meeting_link.value,
+    meeting_date: form.meeting_date.value
+  };
+
+  const res = await fetch("/api/meetings/add-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  if (res.ok) {
+    window.location.href = "/dashboard";
+  } else {
+    alert("Error adding meeting link");
+  }
+
+});
+</script>
+
+{% endblock %}

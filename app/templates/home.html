@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Home • AI Meeting Task Generator{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+
+<section class="grid md:grid-cols-2 gap-12 items-center mb-20">
+
+<div>
+
+<div class="clay-inset px-4 py-1 inline-block text-blue-500 font-bold mb-6">
+Enterprise AI Productivity Tool
+</div>
+
+<h1 class="heading-font text-5xl md:text-7xl font-extrabold text-gray-800 leading-tight mb-6">
+
+Convert Meetings  
+Into <span class="text-emerald-500">Actionable Tasks</span>
+
+</h1>
+
+<p class="text-lg text-gray-500 leading-relaxed mb-8">
+
+AI Meeting → Task Generator automatically converts meeting recordings and transcripts into structured tasks, assignees, priorities, and deadlines — eliminating manual MOM creation and ensuring accountability.
+
+</p>
+
+<div class="flex gap-4">
+
+<a href="/upload" class="clay-button px-8 py-4 bg-[var(--mint)] font-bold">
+Upload Meeting
+</a>
+
+<a href="/kanban" class="clay-button px-8 py-4 font-bold">
+View Tasks
+</a>
+
+</div>
+
+</div>
+
+<!-- Illustration -->
+
+<div class="clay-card p-12 flex items-center justify-center bg-white">
+
+<span class="material-symbols-outlined text-8xl text-emerald-400">
+groups
+</span>
+
+</div>
+
+</section>
+
+<!-- PROBLEM SECTION -->
+
+<section class="mb-20">
+
+<h2 class="heading-font text-4xl font-extrabold mb-10">
+Problems We Solve_
+</h2>
+
+<div class="grid md:grid-cols-3 gap-8">
+
+<div class="clay-card p-8">
+❌ No Minutes of Meeting  
+<br/><br/>
+Teams forget discussions and decisions.
+</div>
+
+<div class="clay-card p-8">
+❌ Tasks Not Assigned  
+<br/><br/>
+No clear accountability after meetings.
+</div>
+
+<div class="clay-card p-8">
+❌ Deadlines Missed  
+<br/><br/>
+No tracking or reminders system.
+</div>
+
+</div>
+
+</section>
+
+<!-- HOW IT WORKS -->
+
+<section class="mb-20">
+
+<h2 class="heading-font text-4xl font-extrabold mb-10">
+How It Works_
+</h2>
+
+<div class="grid md:grid-cols-4 gap-8 text-center">
+
+<div class="clay-card p-6">
+Upload Recording
+</div>
+
+<div class="clay-card p-6">
+Speech → Text
+</div>
+
+<div class="clay-card p-6">
+AI Task Extraction
+</div>
+
+<div class="clay-card p-6">
+Dashboard + Tracking
+</div>
+
+</div>
+
+</section>
+
+<!-- FEATURES -->
+
+<section>
+
+<h2 class="heading-font text-4xl font-extrabold mb-10">
+Enterprise Features_
+</h2>
+
+<div class="grid md:grid-cols-3 gap-8">
+
+<div class="clay-card p-8">
+✔ Auto Task Creation  
+✔ Assignee Detection  
+✔ Priority Tagging
+</div>
+
+<div class="clay-card p-8">
+✔ Kanban Tracking  
+✔ Status Updates  
+✔ Deadline Reminders
+</div>
+
+<div class="clay-card p-8">
+✔ MOM PDF Export  
+✔ Analytics Dashboard  
+✔ AI Insights
+</div>
+
+</div>
+
+</section>
+
+{% endblock %}

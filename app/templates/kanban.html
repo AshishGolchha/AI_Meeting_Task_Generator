@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Kanban • AI.MEET{% endblock %}
+
+{% block content %}
+
+<h1 class="heading-font text-3xl font-extrabold mb-10">
+Task_Kanban
+</h1>
+
+<div class="grid md:grid-cols-3 gap-8">
+
+<!-- ================= Pending ================= -->
+<div
+class="clay-card p-6"
+ondrop="drop(event)"
+ondragover="allowDrop(event)"
+data-status="pending"
+>
+
+<h3 class="font-bold mb-4 text-gray-700">
+Pending
+</h3>
+
+{% for task in pending %}
+
+<div
+class="clay-inset p-4 mb-3 bg-white bg-opacity-40 cursor-move"
+draggable="true"
+ondragstart="drag(event)"
+data-id="{{ task.id }}"
+>
+
+<p class="font-bold text-gray-800">
+{{ task.title }}
+</p>
+
+<p class="text-xs text-gray-500">
+Deadline: {{ task.deadline }}
+</p>
+
+<span class="text-xs font-bold text-yellow-600">
+{{ task.priority }}
+</span>
+
+</div>
+
+{% else %}
+
+<p class="text-sm text-gray-400">
+No pending tasks
+</p>
+
+{% endfor %}
+
+</div>
+
+<!-- ================= In Progress ================= -->
+<div
+class="clay-card p-6"
+ondrop="drop(event)"
+ondragover="allowDrop(event)"
+data-status="in_progress"
+>
+
+<h3 class="font-bold mb-4 text-blue-600">
+In Progress
+</h3>
+
+{% for task in progress %}
+
+<div
+class="clay-inset p-4 mb-3 bg-white bg-opacity-40 cursor-move"
+draggable="true"
+ondragstart="drag(event)"
+data-id="{{ task.id }}"
+>
+
+<p class="font-bold">
+{{ task.title }}
+</p>
+
+<p class="text-xs">
+Deadline: {{ task.deadline }}
+</p>
+
+</div>
+
+{% else %}
+
+<p class="text-sm text-gray-400">
+No tasks in progress
+</p>
+
+{% endfor %}
+
+</div>
+
+<!-- ================= Completed ================= -->
+<div
+class="clay-card p-6"
+ondrop="drop(event)"
+ondragover="allowDrop(event)"
+data-status="completed"
+>
+
+<h3 class="font-bold mb-4 text-emerald-600">
+Completed
+</h3>
+
+{% for task in completed %}
+
+<div
+class="clay-inset p-4 mb-3 bg-white bg-opacity-40 cursor-move"
+draggable="true"
+ondragstart="drag(event)"
+data-id="{{ task.id }}"
+>
+
+<p class="font-bold line-through text-gray-500">
+{{ task.title }}
+</p>
+
+</div>
+
+{% else %}
+
+<p class="text-sm text-gray-400">
+No completed tasks
+</p>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+<script>
+
+function allowDrop(ev) {
+  ev.preventDefault();
+}
+
+function drag(ev) {
+  ev.dataTransfer.setData(
+    "task_id",
+    ev.target.dataset.id
+  );
+}
+
+function drop(ev) {
+
+  ev.preventDefault();
+
+  const taskId =
+    ev.dataTransfer.getData("task_id");
+
+  const newStatus =
+    ev.currentTarget.dataset.status;
+
+  // Move UI
+  const card = document.querySelector(
+    `[data-id='${taskId}']`
+  );
+
+  ev.currentTarget.appendChild(card);
+
+  // Update DB
+  fetch(`/api/tasks/${taskId}/status`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      status: newStatus
+    })
+  });
+
+}
+
+</script>
+
+{% endblock %}

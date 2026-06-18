@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Meeting • AI.MEET{% endblock %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto clay-card p-10">
+
+<h1 class="heading-font text-3xl font-extrabold mb-8">
+Upload_Meeting
+</h1>
+
+<!-- ================= Upload Form ================= -->
+
+<form
+action="/upload"
+method="POST"
+enctype="multipart/form-data"
+class="space-y-6"
+>
+
+<!-- Title -->
+<input
+name="title"
+placeholder="Meeting Title"
+class="clay-inset w-full p-4"
+required
+/>
+
+<!-- Description -->
+<textarea
+name="description"
+placeholder="Description"
+class="clay-inset w-full p-4"
+required
+></textarea>
+
+<!-- Date -->
+<input
+type="date"
+name="meeting_date"
+class="clay-inset w-full p-4"
+required
+/>
+
+<!-- Audio -->
+<input
+type="file"
+name="audio"
+accept="audio/*"
+class="clay-inset w-full p-4"
+required
+/>
+
+<!-- Submit -->
+<button
+type="submit"
+class="clay-button bg-[var(--mint)] font-bold px-8 py-3"
+>
+
+Upload & Show Tasks
+
+</button>
+
+</form>
+
+</div>
+
+{% endblock %}

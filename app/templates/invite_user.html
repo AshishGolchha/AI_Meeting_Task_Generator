@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Invite User{% endblock %}
+
+{% block content %}
+
+<div class="max-w-md mx-auto mt-16 clay-card p-10">
+
+<h2 class="heading-font text-2xl font-extrabold mb-6">
+Invite_User
+</h2>
+
+<form method="POST" class="space-y-6">
+
+<input
+  name="email"
+  type="email"
+  placeholder="employee@company.com"
+  class="clay-inset w-full"
+  required
+/>
+
+<select name="role" class="clay-inset w-full">
+
+<option value="member">Member</option>
+<option value="admin">Admin</option>
+
+</select>
+
+<button class="clay-button w-full bg-[var(--mint)] font-bold">
+Send Invite
+</button>
+
+</form>
+
+</div>
+
+{% endblock %}

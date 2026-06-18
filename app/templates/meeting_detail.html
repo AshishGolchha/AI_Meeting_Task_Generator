@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Detail • AI.MEET{% endblock %}
+
+{% block content %}
+
+<div class="grid md:grid-cols-2 gap-10">
+
+<!-- ================= Transcript ================= -->
+
+<div class="clay-card p-8">
+
+<h2 class="heading-font text-2xl font-extrabold mb-6">
+Transcript_
+</h2>
+
+<div class="clay-inset p-6 h-72 overflow-y-auto text-sm bg-white bg-opacity-40">
+
+{{ transcript if transcript else "Transcript not generated yet." }}
+
+</div>
+
+<!-- Future Edit Button -->
+<button class="clay-button mt-6 px-6 py-3 font-bold">
+Edit Transcript
+</button>
+
+</div>
+
+<!-- ================= Tasks ================= -->
+
+<div class="clay-card p-8">
+
+<h2 class="heading-font text-2xl font-extrabold mb-6">
+Extracted_Tasks
+</h2>
+
+<div class="space-y-4">
+
+{% for task in tasks %}
+
+<div class="clay-inset p-4 bg-white bg-opacity-40">
+
+<p class="font-bold text-gray-800">
+{{ task.title }}
+</p>
+
+<p class="text-xs text-gray-500">
+Deadline: {{ task.deadline }}
+</p>
+
+<span class="text-xs font-bold
+{% if task.priority == 'High' %} text-red-500
+{% elif task.priority == 'Medium' %} text-yellow-500
+{% else %} text-green-500
+{% endif %}
+">
+
+{{ task.priority }}
+
+</span>
+
+</div>
+
+{% else %}
+
+<p class="text-sm text-gray-400">
+No tasks extracted yet.
+</p>
+
+{% endfor %}
+
+</div>
+
+<!-- Export MOM -->
+<a href="/api/meetings/{{ meeting_id }}/export"
+class="clay-button mt-6 inline-block px-6 py-3 bg-[var(--pale-blue)] font-bold">
+
+Export MOM PDF
+
+</a>
+
+</div>
+
+</div>
+
+{% endblock %}

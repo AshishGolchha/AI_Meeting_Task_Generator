@@ -1,0 +1,12 @@
+flask
+python-dotenv
+supabase
+google-genai
+speechrecognition
+pydub
+psycopg2-binary
+pyaudio
+requests
+secure-smtplib
+reportlab
+bcrypt

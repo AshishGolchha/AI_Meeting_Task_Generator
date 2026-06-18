@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics • AI.MEET{% endblock %}
+
+{% block content %}
+
+<h1 class="heading-font text-3xl font-extrabold mb-10">
+Analytics_Dashboard
+</h1>
+
+<div class="grid md:grid-cols-4 gap-8">
+
+<!-- Total -->
+<div class="clay-card p-8 bg-[var(--mint)] bg-opacity-40">
+<p class="text-sm font-bold">Total Tasks</p>
+<h2 class="text-3xl font-extrabold">
+{{ stats.total }}
+</h2>
+</div>
+
+<!-- Completed -->
+<div class="clay-card p-8 bg-[var(--pale-blue)] bg-opacity-40">
+<p class="text-sm font-bold">Completed</p>
+<h2 class="text-3xl font-extrabold">
+{{ stats.completed }}
+</h2>
+</div>
+
+<!-- Pending -->
+<div class="clay-card p-8 bg-[var(--lilac)] bg-opacity-40">
+<p class="text-sm font-bold">Pending</p>
+<h2 class="text-3xl font-extrabold">
+{{ stats.pending }}
+</h2>
+</div>
+
+<!-- Overdue -->
+<div class="clay-card p-8">
+<p class="text-sm font-bold">Overdue</p>
+<h2 class="text-3xl font-extrabold">
+{{ stats.overdue }}
+</h2>
+</div>
+
+</div>
+
+{% endblock %}

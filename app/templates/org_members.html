@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Org Members{% endblock %}
+
+{% block content %}
+
+<h1 class="heading-font text-3xl font-extrabold mb-10">
+Org_Members
+</h1>
+
+<!-- ================= CONTAINER ================= -->
+
+<div class="clay-card p-10 bg-white bg-opacity-40 backdrop-blur-xl">
+
+<!-- ================= HEADER ================= -->
+
+<div
+class="grid grid-cols-[2fr_3fr_1fr_1fr_1fr]
+px-8 py-5 mb-4
+text-sm uppercase tracking-widest
+text-gray-800 font-extrabold
+bg-white bg-opacity-60
+backdrop-blur-xl
+rounded-2xl
+shadow-inner">
+
+<span>Name</span> <span>Email</span> <span>Role</span> <span>Joined</span> <span>Actions</span>
+
+</div>
+
+<!-- ================= MEMBERS ================= -->
+
+<div class="space-y-5 mt-6">
+
+{% for user in members %}
+
+<div
+class="grid grid-cols-[2fr_3fr_1fr_1fr_1fr]
+items-center
+px-8
+h-[72px]
+bg-white bg-opacity-70 backdrop-blur-xl
+rounded-3xl shadow-sm
+hover:shadow-md transition">
+
+<!-- NAME -->
+
+<div class="font-bold text-gray-800 truncate">
+{{ user.name }}
+</div>
+
+<!-- EMAIL -->
+
+<div class="text-gray-600 truncate">
+{{ user.email }}
+</div>
+
+<!-- ROLE -->
+
+<div>
+
+<span class="
+px-4 py-1 rounded-full text-xs font-bold capitalize
+
+{% if user.role == 'owner' %}
+bg-purple-100 text-purple-700
+
+{% elif user.role == 'admin' %}
+bg-blue-100 text-blue-700
+
+{% else %}
+bg-emerald-100 text-emerald-700
+
+{% endif %}
+">
+
+{{ user.role }}
+
+</span>
+
+</div>
+
+<!-- JOINED -->
+
+<div class="text-gray-500 text-sm">
+{{ user.created_at[:10] }}
+</div>
+
+<!-- ACTION -->
+
+<div class="flex items-center">
+
+{% if user.role != "owner" %}
+
+<a href="/remove-user/{{ user.id }}"
+class="clay-button px-4 py-2 text-xs font-bold bg-red-100 text-red-600 flex items-center gap-1">
+
+<span class="material-symbols-outlined text-sm">
+delete
+</span>
+
+Remove
+
+</a>
+
+{% endif %}
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+{% endblock %}

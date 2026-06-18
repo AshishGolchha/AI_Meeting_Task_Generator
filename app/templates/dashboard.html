@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard • AI.MEET{% endblock %}
+
+{% block content %}
+
+<!-- ================= STATS ================= -->
+
+<section class="grid md:grid-cols-4 gap-8 mb-12">
+
+<div class="clay-card p-8 bg-[var(--mint)] bg-opacity-40">
+<p class="text-sm font-bold text-emerald-600">TOTAL_TASKS</p>
+<h2 class="heading-font text-4xl font-extrabold mt-2">
+{{ stats.total }}
+</h2>
+</div>
+
+<div class="clay-card p-8 bg-[var(--pale-blue)] bg-opacity-40">
+<p class="text-sm font-bold text-blue-600">IN_PROGRESS</p>
+<h2 class="heading-font text-4xl font-extrabold mt-2">
+{{ stats.in_progress }}
+</h2>
+</div>
+
+<div class="clay-card p-8 bg-[var(--lilac)] bg-opacity-40">
+<p class="text-sm font-bold text-purple-600">COMPLETED</p>
+<h2 class="heading-font text-4xl font-extrabold mt-2">
+{{ stats.completed }}
+</h2>
+</div>
+
+<div class="clay-card p-8">
+<p class="text-sm font-bold text-gray-500">OVERDUE</p>
+<h2 class="heading-font text-4xl font-extrabold mt-2">
+{{ stats.overdue }}
+</h2>
+</div>
+
+</section>
+
+<!-- ================= MAIN ================= -->
+
+<section class="grid md:grid-cols-3 gap-8">
+
+<!-- ========== MEETINGS ========== -->
+
+<div class="md:col-span-2 clay-card p-10">
+
+<div class="flex justify-between items-center mb-8">
+
+<h2 class="heading-font text-3xl font-extrabold">
+Meetings_
+</h2>
+
+<!-- ✅ Upload Button Fixed -->
+<a href="/upload"
+class="clay-button px-6 py-3 bg-[var(--mint)] text-emerald-700 font-bold flex items-center gap-2">
+
+<span class="material-symbols-outlined">upload</span>
+Upload
+
+</a>
+
+</div>
+
+<div class="space-y-6">
+
+{% for meeting in meetings %}
+
+<div class="clay-inset p-6 bg-white bg-opacity-40">
+
+<div class="flex justify-between">
+
+<div>
+<h3 class="font-bold text-lg text-gray-800">
+{{ meeting.title }}
+</h3>
+
+<p class="text-sm text-gray-500">
+{{ meeting.description }}
+</p>
+</div>
+
+<span class="text-xs font-bold text-blue-500">
+{{ meeting.meeting_date }}
+</span>
+
+</div>
+
+<div class="mt-4 flex gap-3">
+
+<!-- ✅ View Tasks -->
+<a href="/meeting/{{ meeting.id }}"
+class="clay-button px-4 py-2 text-sm font-bold">
+
+View Tasks
+
+</a>
+
+<!-- ✅ Export MOM -->
+<a href="/api/meetings/{{ meeting.id }}/export"
+class="clay-button px-4 py-2 text-sm font-bold bg-[var(--pale-blue)]">
+
+Export MOM
+
+</a>
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+<!-- ========== PRIORITY TASKS ========== -->
+
+<aside class="clay-card p-8">
+
+<h2 class="heading-font text-2xl font-extrabold mb-6">
+Priority_Tasks
+</h2>
+
+<div class="space-y-4">
+
+{% for task in priority_tasks %}
+
+<div class="clay-inset p-4 bg-white bg-opacity-40">
+
+<p class="font-bold text-gray-800">
+{{ task.title }}
+</p>
+
+<p class="text-xs text-gray-500">
+Deadline: {{ task.deadline }}
+</p>
+
+<span class="text-xs font-bold
+{% if task.priority == 'High' %} text-red-500
+{% elif task.priority == 'Medium' %} text-yellow-500
+{% else %} text-green-500
+{% endif %}
+">
+
+{{ task.priority }}
+
+</span>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</aside>
+
+</section>
+
+{% endblock %}
