@@ -90,6 +90,7 @@ def meeting_detail(id):
 
     return render_template(
         "meeting_detail.html",
+        meeting=meeting,
         transcript=meeting["transcript"],
         tasks=tasks,
         meeting_id=id

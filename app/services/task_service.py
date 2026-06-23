@@ -11,13 +11,21 @@ def save_tasks(meeting_id, tasks, org_id):
 
     supabase = get_supabase()
 
+    # Delete existing tasks for same meeting_id to prevent duplicates
+    try:
+        supabase.table("tasks").delete().eq("meeting_id", meeting_id).execute()
+        print(f"Deleted existing tasks for meeting {meeting_id} to prevent duplication.")
+    except Exception as e:
+        print(f"Error deleting tasks for meeting {meeting_id}: {e}")
+
     inserted_tasks = []
 
     for task in tasks:
 
         # Map assignee name → user_id
         user_id = map_assignee_to_user(
-            task.get("assigned_to")
+            task.get("assigned_to"),
+            org_id=org_id
         )
 
         data = {
@@ -64,16 +72,26 @@ def save_tasks(meeting_id, tasks, org_id):
 # ==========================================
 # MAP ASSIGNEE NAME → USER ID
 # ==========================================
-def map_assignee_to_user(name):
+def map_assignee_to_user(name, org_id=None):
 
     if not name:
         return None
 
     supabase = get_supabase()
 
+    target_org_id = org_id
+    if not target_org_id:
+        try:
+            target_org_id = session.get("org_id")
+        except:
+            pass
+
+    if not target_org_id:
+        return None
+
     users = supabase.table("users") \
         .select("id,name") \
-        .eq("org_id", session["org_id"]) \
+        .eq("org_id", target_org_id) \
         .execute()
 
     for user in users.data:

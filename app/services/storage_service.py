@@ -22,3 +22,23 @@ def upload_audio_to_storage(file):
     public_url = supabase.storage.from_(bucket).get_public_url(path)
 
     return public_url
+
+
+def upload_local_file_to_storage(file_path, content_type):
+    import os
+    supabase = get_supabase()
+    bucket = current_app.config["STORAGE_BUCKET"]
+    
+    file_ext = file_path.split(".")[-1]
+    file_name = f"{uuid.uuid4()}.{file_ext}"
+    path = f"meetings/{file_name}"
+    
+    with open(file_path, "rb") as f:
+        supabase.storage.from_(bucket).upload(
+            path,
+            f,
+            {"content-type": content_type}
+        )
+        
+    public_url = supabase.storage.from_(bucket).get_public_url(path)
+    return public_url

@@ -4,66 +4,338 @@
 
 {% block content %}
 
-<div class="max-w-3xl mx-auto clay-card p-10">
+<div class="max-w-3xl mx-auto clay-card p-10 bg-white bg-opacity-40 backdrop-blur-xl">
 
-<h1 class="heading-font text-3xl font-extrabold mb-8">
-Upload_Meeting
-</h1>
+  <h1 class="heading-font text-3xl font-extrabold mb-8 text-center text-indigo-600">
+    Upload Meeting_
+  </h1>
 
-<!-- ================= Upload Form ================= -->
+  <!-- Interface Mode Tabs -->
+  <div class="flex gap-4 mb-8 justify-center">
+    <button id="tabRecordBtn" type="button" class="clay-button px-6 py-3 font-bold bg-[var(--pale-blue)] text-blue-600">
+      Record Tab Audio (Primary)
+    </button>
+    <button id="tabUploadBtn" type="button" class="clay-button px-6 py-3 font-bold bg-white text-gray-500 hover:text-gray-700">
+      Upload File (Fallback)
+    </button>
+  </div>
 
-<form
-action="/upload"
-method="POST"
-enctype="multipart/form-data"
-class="space-y-6"
->
+  <!-- Form -->
+  <form
+    id="uploadForm"
+    action="/upload"
+    method="POST"
+    enctype="multipart/form-data"
+    class="space-y-6"
+  >
+    <!-- Title -->
+    <div>
+      <label class="block text-sm font-bold text-gray-700 mb-2">Meeting Title</label>
+      <input
+        name="title"
+        placeholder="e.g. Project Alignment Session"
+        class="clay-inset w-full p-4 border-none focus:outline-none"
+        required
+      />
+    </div>
 
-<!-- Title -->
-<input
-name="title"
-placeholder="Meeting Title"
-class="clay-inset w-full p-4"
-required
-/>
+    <!-- Description -->
+    <div>
+      <label class="block text-sm font-bold text-gray-700 mb-2">Description</label>
+      <textarea
+        name="description"
+        placeholder="Summarize the agenda or details of this meeting..."
+        class="clay-inset w-full p-4 border-none focus:outline-none h-28"
+        required
+      ></textarea>
+    </div>
 
-<!-- Description -->
-<textarea
-name="description"
-placeholder="Description"
-class="clay-inset w-full p-4"
-required
-></textarea>
+    <!-- Date -->
+    <div>
+      <label class="block text-sm font-bold text-gray-700 mb-2">Meeting Date</label>
+      <input
+        type="date"
+        name="meeting_date"
+        class="clay-inset w-full p-4 border-none focus:outline-none"
+        required
+      />
+    </div>
 
-<!-- Date -->
-<input
-type="date"
-name="meeting_date"
-class="clay-inset w-full p-4"
-required
-/>
+    <!-- 🎙️ Recording Section (Primary UI) -->
+    <div id="recordSection" class="p-8 clay-inset bg-white bg-opacity-60 flex flex-col items-center space-y-6">
+      <h3 class="heading-font font-bold text-lg text-gray-800">Tab Audio Recorder</h3>
+      
+      <!-- Recording Status Badge & Dot -->
+      <div class="flex items-center gap-3">
+        <span id="recordingDot" class="w-4.5 h-4.5 rounded-full bg-gray-400"></span>
+        <span id="recordingStatusText" class="text-sm font-bold text-gray-500 tracking-wider uppercase">Idle</span>
+      </div>
 
-<!-- Audio -->
-<input
-type="file"
-name="audio"
-accept="audio/*"
-class="clay-inset w-full p-4"
-required
-/>
+      <!-- Elapsed Timer -->
+      <div id="timerDisplay" class="text-4xl font-extrabold heading-font text-gray-700 select-none">00:00:00</div>
 
-<!-- Submit -->
-<button
-type="submit"
-class="clay-button bg-[var(--mint)] font-bold px-8 py-3"
->
+      <!-- Error and Info Banners -->
+      <div id="noAudioBanner" class="hidden p-4 clay-inset bg-red-100 text-red-800 text-sm font-bold w-full text-center">
+        No tab audio detected. Please select a browser tab and enable Share Tab Audio.
+      </div>
 
-Upload & Show Tasks
+      <div id="warningBanner" class="hidden p-4 clay-inset bg-amber-100 text-amber-800 text-sm font-bold w-full text-center animate-pulse">
+        ⚠️ Recording will automatically stop in 5 minutes (4 hours maximum limit).
+      </div>
 
-</button>
+      <!-- Recording Control Buttons -->
+      <div class="flex gap-4">
+        <button
+          id="startRecordBtn"
+          type="button"
+          class="clay-button px-6 py-3 bg-[var(--mint)] text-emerald-700 font-bold flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined text-lg">fiber_manual_record</span>
+          Start Recording
+        </button>
+        <button
+          id="stopRecordBtn"
+          type="button"
+          class="clay-button px-6 py-3 bg-red-100 text-red-600 font-bold flex items-center gap-2 opacity-50 cursor-not-allowed"
+          disabled
+        >
+          <span class="material-symbols-outlined text-lg">stop</span>
+          Stop Recording
+        </button>
+      </div>
+    </div>
 
-</form>
+    <!-- 📂 File Upload Section (Fallback UI) -->
+    <div id="uploadSection" class="hidden p-8 clay-inset bg-white bg-opacity-60">
+      <h3 class="heading-font font-bold text-lg text-gray-800 mb-4 text-center">Upload Audio File</h3>
+      <input
+        type="file"
+        id="audioInput"
+        name="audio"
+        accept="audio/*"
+        class="clay-inset w-full p-4 border-none bg-white focus:outline-none"
+      />
+    </div>
+
+    <!-- Submit Form Button -->
+    <button
+      type="submit"
+      class="clay-button w-full bg-[var(--mint)] font-bold py-4 text-emerald-700 text-lg hover:bg-emerald-200 mt-8"
+    >
+      Upload & Process
+    </button>
+
+  </form>
 
 </div>
+
+<script>
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
+let timerInterval = null;
+let startTime = null;
+let warningTimeout = null;
+let stopTimeout = null;
+
+const tabRecordBtn = document.getElementById("tabRecordBtn");
+const tabUploadBtn = document.getElementById("tabUploadBtn");
+const recordSection = document.getElementById("recordSection");
+const uploadSection = document.getElementById("uploadSection");
+
+const startRecordBtn = document.getElementById("startRecordBtn");
+const stopRecordBtn = document.getElementById("stopRecordBtn");
+const recordingDot = document.getElementById("recordingDot");
+const recordingStatusText = document.getElementById("recordingStatusText");
+const timerDisplay = document.getElementById("timerDisplay");
+const noAudioBanner = document.getElementById("noAudioBanner");
+const warningBanner = document.getElementById("warningBanner");
+const audioInput = document.getElementById("audioInput");
+const uploadForm = document.getElementById("uploadForm");
+
+let currentMode = "record"; // "record" | "upload"
+
+// Tab switching
+tabRecordBtn.onclick = () => {
+  currentMode = "record";
+  tabRecordBtn.classList.add("bg-[var(--pale-blue)]", "text-blue-600");
+  tabRecordBtn.classList.remove("bg-white", "text-gray-500");
+  tabUploadBtn.classList.add("bg-white", "text-gray-500");
+  tabUploadBtn.classList.remove("bg-[var(--pale-blue)]", "text-blue-600");
+  recordSection.classList.remove("hidden");
+  uploadSection.classList.add("hidden");
+};
+
+tabUploadBtn.onclick = () => {
+  currentMode = "upload";
+  tabUploadBtn.classList.add("bg-[var(--pale-blue)]", "text-blue-600");
+  tabUploadBtn.classList.remove("bg-white", "text-gray-500");
+  tabRecordBtn.classList.add("bg-white", "text-gray-500");
+  tabRecordBtn.classList.remove("bg-[var(--pale-blue)]", "text-blue-600");
+  uploadSection.classList.remove("hidden");
+  recordSection.classList.add("hidden");
+};
+
+// Recording controls
+startRecordBtn.onclick = async () => {
+  try {
+    noAudioBanner.classList.add("hidden");
+    warningBanner.classList.add("hidden");
+    recordedChunks = [];
+
+    // Capture browser tab screen/audio. Requires user interaction.
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true
+    });
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      noAudioBanner.classList.remove("hidden");
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+
+    recordingStream = stream;
+
+    // Monitor manual stream termination (e.g. browser's Stop Sharing popup)
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.onended = () => {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          stopRecording();
+        }
+      };
+    }
+
+    // Build recording pipeline around audio tracks only
+    const audioStream = new MediaStream(audioTracks);
+    mediaRecorder = new MediaRecorder(audioStream, { mimeType: "audio/webm" });
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      finalizeRecording();
+    };
+
+    // Activate recorder
+    mediaRecorder.start();
+    startTime = Date.now();
+
+    // UI Updates
+    recordingDot.classList.remove("bg-gray-400");
+    recordingDot.classList.add("bg-red-500", "animate-pulse");
+    recordingStatusText.innerText = "Recording...";
+    recordingStatusText.classList.remove("text-gray-500");
+    recordingStatusText.classList.add("text-red-500");
+
+    startRecordBtn.disabled = true;
+    startRecordBtn.classList.add("opacity-50", "cursor-not-allowed");
+    stopRecordBtn.disabled = false;
+    stopRecordBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+    // Start timer interval
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+
+    // Recording duration limits
+    // 3h 55m warning (14,100,000 milliseconds)
+    warningTimeout = setTimeout(() => {
+      warningBanner.classList.remove("hidden");
+    }, 14100000);
+
+    // 4h auto-stop (14,400,000 milliseconds)
+    stopTimeout = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        stopRecording();
+        alert("Recording stopped automatically. Maximum limit of 4 hours reached.");
+      }
+    }, 14400000);
+
+  } catch (err) {
+    console.error("Could not capture tab audio:", err);
+    alert("Error selecting/recording tab audio: " + err.message);
+  }
+};
+
+stopRecordBtn.onclick = () => {
+  stopRecording();
+};
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+}
+
+function updateTimerDisplay() {
+  const elapsed = Date.now() - startTime;
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const secs = String(totalSeconds % 60).padStart(2, "0");
+  timerDisplay.innerText = `${hrs}:${mins}:${secs}`;
+}
+
+function finalizeRecording() {
+  // Release browser tab screen share highlight
+  if (recordingStream) {
+    recordingStream.getTracks().forEach(track => track.stop());
+  }
+
+  // Clear timers and warnings
+  clearInterval(timerInterval);
+  clearTimeout(warningTimeout);
+  clearTimeout(stopTimeout);
+
+  recordingDot.classList.remove("bg-red-500", "animate-pulse");
+  recordingDot.classList.add("bg-gray-400");
+  recordingStatusText.innerText = "Stopped";
+  recordingStatusText.classList.remove("text-red-500");
+  recordingStatusText.classList.add("text-gray-500");
+
+  startRecordBtn.disabled = false;
+  startRecordBtn.classList.remove("opacity-50", "cursor-not-allowed");
+  stopRecordBtn.disabled = true;
+  stopRecordBtn.classList.add("opacity-50", "cursor-not-allowed");
+
+  // Save blob, construct File and insert into the form file input
+  if (recordedChunks.length > 0) {
+    const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
+    const recordingFile = new File([audioBlob], "recording.webm", { type: "audio/webm" });
+
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(recordingFile);
+    audioInput.files = dataTransfer.files;
+
+    console.log("Recorded file transferred to input field successfully.");
+  }
+}
+
+// Validator prior to upload
+uploadForm.onsubmit = (e) => {
+  if (currentMode === "record") {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      e.preventDefault();
+      alert("Please stop recording your tab session before attempting to upload.");
+      return false;
+    }
+    if (!audioInput.files || audioInput.files.length === 0) {
+      e.preventDefault();
+      alert("No audio recorded. Please start and capture tab audio first, or switch to manual file upload.");
+      return false;
+    }
+  } else if (currentMode === "upload") {
+    if (!audioInput.files || audioInput.files.length === 0) {
+      e.preventDefault();
+      alert("Please select an audio file to upload.");
+      return false;
+    }
+  }
+};
+</script>
 
 {% endblock %}
