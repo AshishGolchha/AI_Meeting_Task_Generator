@@ -94,6 +94,9 @@ def meeting_detail(id):
         return "Meeting not found", 404
 
     meeting = data["meeting"]
+    if meeting.get("org_id") != session.get("org_id"):
+        return "Forbidden", 403
+
     tasks = data["tasks"]
 
     return render_template(

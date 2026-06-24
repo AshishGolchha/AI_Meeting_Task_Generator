@@ -47,18 +47,61 @@ def _worker_loop(app):
             traceback.print_exc()
         
         # Poll database every 5 seconds for new uploads
-        time.sleep(5)
+        poll_interval = app.config.get("WORKER_POLL_INTERVAL_SEC", 5)
+        time.sleep(poll_interval)
+
+def recover_stale_locks(supabase):
+    """Automatically clears locks that have been held for more than 30 minutes, resetting status for retry."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    threshold = now - datetime.timedelta(minutes=30)
+    
+    stale_jobs = supabase.table("meetings") \
+        .select("id, processing_history, processing_logs") \
+        .eq("processing_lock", True) \
+        .eq("is_deleted", False) \
+        .lt("processing_started_at", threshold.isoformat()) \
+        .execute()
+        
+    for job in stale_jobs.data:
+        meeting_id = job["id"]
+        logs = job.get("processing_logs") or []
+        history = job.get("processing_history") or []
+        
+        logs.append("stale_lock_recovered")
+        history.append({
+            "timestamp": now.isoformat(),
+            "event": "stale_lock_recovered",
+            "message": "Stale lock detected (>30 min). Clear lock and allow processing to continue."
+        })
+        logs, history = _trim_processing_metadata(logs, history)
+        
+        supabase.table("meetings").update({
+            "recording_status": "uploaded",
+            "processing_step": "uploaded",
+            "processing_lock": False,
+            "processing_started_at": None,
+            "processing_logs": logs,
+            "processing_history": history
+        }).eq("id", meeting_id).execute()
+        print(f"[Async Runner] Stale lock recovered for meeting {meeting_id}")
 
 def _poll_and_process(app):
     supabase = get_supabase()
     
-    # Query for meetings with 'uploaded' status, which are not deleted
+    # 0. Recover any stale locks before starting
+    try:
+        recover_stale_locks(supabase)
+    except Exception as e:
+        print(f"[Async Runner] Error running stale lock recovery: {e}")
+    
+    # Query for meetings with 'uploaded' status, order by oldest first, limit 1
     res = supabase.table("meetings") \
         .select("id, org_id, created_by, title") \
         .eq("recording_status", "uploaded") \
         .eq("is_deleted", False) \
         .eq("processing_lock", False) \
-        .limit(5) \
+        .order("created_at") \
+        .limit(1) \
         .execute()
         
     if not res.data:
@@ -76,8 +119,9 @@ def _poll_and_process(app):
         
         # Verify and fetch current logs/history
         meeting_data = supabase.table("meetings") \
-            .select("processing_logs, processing_history") \
+            .select("processing_logs, processing_history, org_id") \
             .eq("id", meeting_id) \
+            .eq("org_id", org_id) \
             .single() \
             .execute()
             
@@ -100,7 +144,7 @@ def _poll_and_process(app):
             "processing_step": "transcribing",
             "processing_logs": logs,
             "processing_history": history
-        }).eq("id", meeting_id).eq("processing_lock", False).execute()
+        }).eq("id", meeting_id).eq("org_id", org_id).eq("processing_lock", False).eq("recording_status", "uploaded").execute()
         
         if not lock_res.data:
             print(f"[Async Runner] Race condition avoided. Meeting {meeting_id} already locked.")
@@ -109,31 +153,58 @@ def _poll_and_process(app):
         print(f"[Async Runner] Atomic lock acquired for meeting {meeting_id}. Processing...")
         
         # Run processing logic
-        _execute_job(meeting_id, org_id, created_by, app)
+        execute_job(meeting_id, org_id, created_by, app)
 
-def _execute_job(meeting_id, org_id, created_by, app):
+def execute_job(meeting_id, org_id, created_by, app):
     supabase = get_supabase()
     
+    def status_callback(chunk_num, total_chunks, chunk_transcript):
+        try:
+            m_data = supabase.table("meetings") \
+                .select("partial_transcript, processing_logs, org_id") \
+                .eq("id", meeting_id) \
+                .eq("org_id", org_id) \
+                .single() \
+                .execute()
+            current_partial = m_data.data.get("partial_transcript") or ""
+            new_partial = (current_partial + " " + chunk_transcript).strip()
+            
+            logs = m_data.data.get("processing_logs") or []
+            logs.append(f"chunk_{chunk_num}_completed")
+            logs = logs[-100:]
+            
+            supabase.table("meetings").update({
+                "partial_transcript": new_partial,
+                "processing_logs": logs
+            }).eq("id", meeting_id).eq("org_id", org_id).execute()
+            print(f"[Async Runner] Chunk {chunk_num}/{total_chunks} transcription persisted for meeting {meeting_id}.")
+        except Exception as e:
+            print(f"[Async Runner] Error in chunk status_callback: {e}")
+            
     try:
         # Fetch the meeting to get audio_url
-        meeting_res = supabase.table("meetings").select("audio_url").eq("id", meeting_id).single().execute()
+        meeting_res = supabase.table("meetings") \
+            .select("audio_url, org_id") \
+            .eq("id", meeting_id) \
+            .eq("org_id", org_id) \
+            .single() \
+            .execute()
         audio_url = meeting_res.data.get("audio_url")
         if not audio_url:
             raise Exception("Audio URL not found on meeting record")
 
-        # 2. Gemini Cost/Quota Protection & Chunk count check
-        # We must calculate chunks before transcribing. Let's do this by loading audio stats.
-        # speech_service is responsible for transcription, but we can verify chunks.
-        # Let's perform chunk check inside speech_service, which raises custom Exception.
-        # If it raises, we handle it and fail the meeting.
-        
         # 3. Speech → Text
         # Note: we pass the public URL. Speech service handles download, chunking and transcription.
-        transcript_text, duration, size = transcribe_audio(audio_url)
+        transcript_text, duration, size = transcribe_audio(audio_url, status_callback=status_callback)
         
         # Update checkpoint to extracting_tasks
         now = datetime.datetime.now(datetime.timezone.utc)
-        m_res = supabase.table("meetings").select("processing_logs, processing_history").eq("id", meeting_id).single().execute()
+        m_res = supabase.table("meetings") \
+            .select("processing_logs, processing_history, org_id") \
+            .eq("id", meeting_id) \
+            .eq("org_id", org_id) \
+            .single() \
+            .execute()
         current_logs = m_res.data.get("processing_logs") or []
         current_history = m_res.data.get("processing_history") or []
         
@@ -148,13 +219,14 @@ def _execute_job(meeting_id, org_id, created_by, app):
         
         supabase.table("meetings").update({
             "transcript": transcript_text,
+            "partial_transcript": None,
             "recording_duration": duration,
             "recording_size": size,
             "recording_status": "extracting_tasks",
             "processing_step": "extracting_tasks",
             "processing_logs": current_logs,
             "processing_history": current_history
-        }).eq("id", meeting_id).execute()
+        }).eq("id", meeting_id).eq("org_id", org_id).execute()
         
         # 4. LLM Task Extraction
         ai_data = extract_tasks_from_transcript(transcript_text)
@@ -175,7 +247,12 @@ def _execute_job(meeting_id, org_id, created_by, app):
         
         # Complete meeting
         now = datetime.datetime.now(datetime.timezone.utc)
-        m_res = supabase.table("meetings").select("processing_logs, processing_history").eq("id", meeting_id).single().execute()
+        m_res = supabase.table("meetings") \
+            .select("processing_logs, processing_history, org_id") \
+            .eq("id", meeting_id) \
+            .eq("org_id", org_id) \
+            .single() \
+            .execute()
         current_logs = m_res.data.get("processing_logs") or []
         current_history = m_res.data.get("processing_history") or []
         
@@ -195,26 +272,32 @@ def _execute_job(meeting_id, org_id, created_by, app):
             "processing_logs": current_logs,
             "processing_history": current_history,
             "processed_at": now.isoformat(),
-            "processing_error": None
-        }).eq("id", meeting_id).execute()
+            "processing_error": None,
+            "partial_transcript": None
+        }).eq("id", meeting_id).eq("org_id", org_id).execute()
         
         print(f"[Async Runner] Meeting {meeting_id} processed successfully.")
 
     except PartialTranscriptionError as pte:
         print(f"[Async Runner] Partial transcription error on meeting {meeting_id}: {pte}")
-        _mark_job_failed(meeting_id, str(pte), partial_transcript=pte.partial_transcript)
+        _mark_job_failed(meeting_id, org_id, str(pte), partial_transcript=pte.partial_transcript)
         
     except Exception as exc:
         print(f"[Async Runner] General processing failure on meeting {meeting_id}: {exc}")
         traceback.print_exc()
-        _mark_job_failed(meeting_id, str(exc))
+        _mark_job_failed(meeting_id, org_id, str(exc))
 
-def _mark_job_failed(meeting_id, error_msg, partial_transcript=None):
+def _mark_job_failed(meeting_id, org_id, error_msg, partial_transcript=None):
     try:
         supabase = get_supabase()
         now = datetime.datetime.now(datetime.timezone.utc)
         
-        m_res = supabase.table("meetings").select("processing_logs, processing_history").eq("id", meeting_id).single().execute()
+        m_res = supabase.table("meetings") \
+            .select("processing_logs, processing_history, org_id") \
+            .eq("id", meeting_id) \
+            .eq("org_id", org_id) \
+            .single() \
+            .execute()
         current_logs = m_res.data.get("processing_logs") or []
         current_history = m_res.data.get("processing_history") or []
         
@@ -235,9 +318,9 @@ def _mark_job_failed(meeting_id, error_msg, partial_transcript=None):
             "processing_error": error_msg
         }
         if partial_transcript is not None:
-            update_data["transcript"] = partial_transcript
+            update_data["partial_transcript"] = partial_transcript
             
-        supabase.table("meetings").update(update_data).eq("id", meeting_id).execute()
+        supabase.table("meetings").update(update_data).eq("id", meeting_id).eq("org_id", org_id).execute()
     except Exception as e:
         print(f"[Async Runner] Critical error marking meeting {meeting_id} as failed: {e}")
 

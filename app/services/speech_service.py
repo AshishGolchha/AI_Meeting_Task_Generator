@@ -19,7 +19,7 @@ class PartialTranscriptionError(Exception):
         self.partial_transcript = partial_transcript
 
 
-def transcribe_audio(audio_url):
+def transcribe_audio(audio_url, status_callback=None):
     """
     Accepts Supabase public URL.
     Downloads audio -> loads using pydub -> chunks (if duration > threshold) ->
@@ -169,6 +169,11 @@ def transcribe_audio(audio_url):
                                 print(f"Warning: Failed to delete Gemini file {myfile.name}: {del_err}")
 
                 completed_chunks.append(chunk_transcript.strip())
+                if status_callback:
+                    status_callback(chunk_num, len(chunks), chunk_transcript)
+                if idx < len(chunks) - 1:
+                    print("Sleeping 2 seconds to throttle Gemini token usage...")
+                    time.sleep(2)
 
             finally:
                 # Clean up local chunk file

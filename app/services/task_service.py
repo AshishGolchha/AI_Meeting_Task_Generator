@@ -13,7 +13,7 @@ def save_tasks(meeting_id, tasks, org_id):
 
     # Delete existing tasks for same meeting_id to prevent duplicates
     try:
-        supabase.table("tasks").delete().eq("meeting_id", meeting_id).execute()
+        supabase.table("tasks").delete().eq("meeting_id", meeting_id).eq("org_id", org_id).execute()
         print(f"Deleted existing tasks for meeting {meeting_id} to prevent duplication.")
     except Exception as e:
         print(f"Error deleting tasks for meeting {meeting_id}: {e}")

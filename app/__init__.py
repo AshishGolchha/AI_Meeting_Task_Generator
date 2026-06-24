@@ -1,5 +1,6 @@
 from flask import Flask, session
-from .config import Config
+import os
+from .config import Config, validate_required_secrets
 from .utils.logging_config import setup_logging
 from .utils.async_runner import start_background_worker, recover_crashed_jobs
 
@@ -9,6 +10,7 @@ def create_app():
 
     app = Flask(__name__)
     app.config.from_object(Config)
+    validate_required_secrets()
 
     @app.context_processor
     def inject_user():
@@ -25,6 +27,7 @@ def create_app():
     from .routes.dashboard_routes import dashboard_bp
     from .routes.auth_routes import auth_bp
     from .routes.org_routes import org_bp
+    from .routes.admin_routes import admin_bp
 
     app.register_blueprint(meeting_bp, url_prefix="/api/meetings")
     app.register_blueprint(task_bp, url_prefix="/api/tasks")
@@ -32,12 +35,14 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(org_bp)
+    app.register_blueprint(admin_bp, url_prefix="/api/admin")
 
     # 2. Run Startup Recovery Routine to release crashed jobs
     with app.app_context():
         recover_crashed_jobs(app)
 
-    # 3. Start DB-Queue asynchronous processing daemon
-    start_background_worker(app)
+    # 3. Start DB-Queue asynchronous processing daemon only when enabled
+    if os.getenv("ENABLE_BACKGROUND_WORKER", "").lower() == "true":
+        start_background_worker(app)
 
     return app
