@@ -42,3 +42,23 @@ def upload_local_file_to_storage(file_path, content_type):
         
     public_url = supabase.storage.from_(bucket).get_public_url(path)
     return public_url
+
+
+def delete_audio_from_storage(audio_url):
+    if not audio_url:
+        return
+        
+    try:
+        supabase = get_supabase()
+        try:
+            bucket = current_app.config["STORAGE_BUCKET"]
+        except Exception:
+            bucket = "meetings-audio"
+            
+        filename = audio_url.split("/")[-1]
+        path = f"meetings/{filename}"
+        
+        supabase.storage.from_(bucket).remove([path])
+        print(f"[Storage Service] Deleted remote storage audio file: {path}")
+    except Exception as e:
+        print(f"[Storage Service] Error deleting file from storage: {e}")

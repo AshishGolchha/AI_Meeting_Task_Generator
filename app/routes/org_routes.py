@@ -10,12 +10,10 @@ org_bp = Blueprint(
     template_folder="../templates"
 )
 
-
 @org_bp.route("/invite", methods=["GET", "POST"])
 @login_required
 @role_required(["owner","admin"])
 def invite():
-
     if request.method == "GET":
         return render_template("invite_user.html")
 
@@ -28,7 +26,6 @@ def invite():
 
 @org_bp.route("/join/<invite_code>")
 def join(invite_code):
-
     supabase = get_supabase()
 
     invite = supabase.table("org_invitations") \
@@ -50,11 +47,8 @@ def join(invite_code):
 @login_required
 @role_required(["owner","admin"])
 def members():
-
     org_id = session["org_id"]
-
     members = get_org_members(org_id)
-
     return render_template(
         "org_members.html",
         members=members
@@ -62,12 +56,23 @@ def members():
 
 @org_bp.route("/remove-user/<user_id>")
 @login_required
+@role_required(["owner","admin"])
 def remove_user(user_id):
-
     supabase = get_supabase()
+    org_id = session["org_id"]
 
+    # BOLA Security check: Verify target user is in the same organization
+    user_res = supabase.table("users") \
+        .select("org_id") \
+        .eq("id", user_id) \
+        .execute()
+        
+    if not user_res.data or user_res.data[0].get("org_id") != org_id:
+        return "Forbidden or user not found", 403
+
+    # Remove organization reference
     supabase.table("users").update({
         "org_id": None
-    }).eq("id", user_id).execute()
+    }).eq("id", user_id).eq("org_id", org_id).execute()
 
     return redirect("/members")

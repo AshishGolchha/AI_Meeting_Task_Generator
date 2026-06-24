@@ -1,13 +1,17 @@
 from flask import Flask, session
 from .config import Config
+from .utils.logging_config import setup_logging
+from .utils.async_runner import start_background_worker, recover_crashed_jobs
 
 def create_app():
+    # 1. Initialize structured logging
+    setup_logging()
+
     app = Flask(__name__)
     app.config.from_object(Config)
 
     @app.context_processor
     def inject_user():
-
         return dict(
             current_user=session.get("user_id"),
             current_org=session.get("org_id"),
@@ -28,5 +32,12 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(org_bp)
+
+    # 2. Run Startup Recovery Routine to release crashed jobs
+    with app.app_context():
+        recover_crashed_jobs(app)
+
+    # 3. Start DB-Queue asynchronous processing daemon
+    start_background_worker(app)
 
     return app

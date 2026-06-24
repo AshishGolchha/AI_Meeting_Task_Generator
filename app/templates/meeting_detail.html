@@ -13,7 +13,7 @@
       <h2 class="heading-font text-2xl font-extrabold">
         Transcript_
       </h2>
-      <span class="text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wider
+      <span id="statusBadge" class="text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wider
       {% if meeting.recording_status == 'completed' %} bg-emerald-100 text-emerald-800
       {% elif meeting.recording_status == 'transcribing' %} bg-blue-100 text-blue-800 animate-pulse
       {% elif meeting.recording_status == 'extracting_tasks' %} bg-purple-100 text-purple-800 animate-pulse
@@ -25,8 +25,22 @@
       </span>
     </div>
 
-    <div class="clay-inset p-6 h-72 overflow-y-auto text-sm bg-white bg-opacity-40">
-      {{ transcript if transcript else "Transcript not generated yet." }}
+    <!-- 📊 Live Progress Bar -->
+    <div id="progressContainer" class="w-full bg-gray-100 clay-inset p-1 rounded-full mb-6 hidden">
+      <div id="progressBar" class="bg-indigo-500 h-3 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+      <div class="flex justify-between text-xs font-bold text-gray-600 mt-2 px-1">
+        <span id="progressStep">Initializing...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="hidden p-4 mb-6 clay-inset bg-red-100 text-red-800 text-sm font-bold w-full text-center">
+      ⚠️ Processing failed: <span id="errorDetails">Unknown error</span>
+    </div>
+
+    <div id="transcriptBox" class="clay-inset p-6 h-72 overflow-y-auto text-sm bg-white bg-opacity-40">
+      {{ transcript if transcript else "Transcript is being generated. Please wait..." }}
     </div>
 
     <!-- Future Edit Button -->
@@ -43,7 +57,7 @@
       Extracted_Tasks
     </h2>
 
-    <div class="space-y-4">
+    <div id="tasksContainer" class="space-y-4">
       {% for task in tasks %}
         <div class="clay-inset p-4 bg-white bg-opacity-40">
           <p class="font-bold text-gray-800">
@@ -62,7 +76,7 @@
           </span>
         </div>
       {% else %}
-        <p class="text-sm text-gray-400">
+        <p id="noTasksMsg" class="text-sm text-gray-400">
           No tasks extracted yet.
         </p>
       {% endfor %}
@@ -71,13 +85,19 @@
     <div class="mt-6 flex gap-4 flex-wrap">
       <!-- Export MOM -->
       <a href="/api/meetings/{{ meeting_id }}/export"
-         class="clay-button inline-block px-6 py-3 bg-[var(--pale-blue)] font-bold">
+         id="exportBtn"
+         class="clay-button inline-block px-6 py-3 bg-[var(--pale-blue)] font-bold {% if meeting.recording_status != 'completed' %} opacity-50 cursor-not-allowed pointer-events-none {% endif %}">
         Export MOM PDF
       </a>
       
       <!-- Reprocess Meeting -->
       <button id="reprocessBtn" class="clay-button px-6 py-3 bg-amber-100 text-amber-700 hover:bg-amber-200 font-bold">
         Reprocess Meeting
+      </button>
+
+      <!-- Delete Meeting -->
+      <button id="deleteBtn" class="clay-button px-6 py-3 bg-red-100 text-red-700 hover:bg-red-200 font-bold">
+        Delete Meeting
       </button>
     </div>
 
@@ -86,6 +106,108 @@
 </div>
 
 <script>
+const meetingId = "{{ meeting_id }}";
+let pollingInterval = null;
+
+// Initial state inspection
+const initialStatus = "{{ meeting.recording_status or 'pending' }}";
+
+if (initialStatus !== "completed" && initialStatus !== "failed") {
+  startStatusPolling();
+}
+
+function startStatusPolling() {
+  document.getElementById("progressContainer").classList.remove("hidden");
+  
+  pollingInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}/status`);
+      if (!res.ok) throw new Error("Failed to fetch status");
+      
+      const data = await res.json();
+      updateProcessingUI(data);
+      
+      // Stop polling on terminal states
+      if (data.recording_status === "completed" || data.recording_status === "failed") {
+        stopStatusPolling();
+        
+        // Dynamic full DOM update on completion/failure
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (err) {
+      console.error("Polling error:", err);
+    }
+  }, 3000);
+}
+
+function stopStatusPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+    console.log("Polling stopped.");
+  }
+}
+
+// Clean up polling timer on page unload to prevent memory leaks
+window.addEventListener("beforeunload", () => {
+  stopStatusPolling();
+});
+
+function updateProcessingUI(data) {
+  const statusBadge = document.getElementById("statusBadge");
+  const progressBar = document.getElementById("progressBar");
+  const progressPercent = document.getElementById("progressPercent");
+  const progressStep = document.getElementById("progressStep");
+  
+  // 1. Update Badge text & color classes
+  statusBadge.innerText = data.recording_status;
+  statusBadge.className = "text-xs px-3 py-1.5 rounded-full font-bold uppercase tracking-wider";
+  
+  if (data.recording_status === "completed") {
+    statusBadge.classList.add("bg-emerald-100", "text-emerald-800");
+  } else if (data.recording_status === "transcribing") {
+    statusBadge.classList.add("bg-blue-100", "text-blue-800", "animate-pulse");
+  } else if (data.recording_status === "extracting_tasks") {
+    statusBadge.classList.add("bg-purple-100", "text-purple-800", "animate-pulse");
+  } else if (data.recording_status === "uploaded") {
+    statusBadge.classList.add("bg-sky-100", "text-sky-800");
+  } else if (data.recording_status === "failed") {
+    statusBadge.classList.add("bg-red-100", "text-red-800");
+  } else {
+    statusBadge.classList.add("bg-gray-100", "text-gray-800");
+  }
+  
+  // 2. Update Progress Bar
+  progressBar.style.width = `${data.progress_percentage}%`;
+  progressPercent.innerText = `${data.progress_percentage}%`;
+  
+  // 3. Update Step description
+  let stepText = "Initializing...";
+  if (data.processing_step === "uploaded") {
+    stepText = "File Uploaded. In Queue...";
+  } else if (data.processing_step === "transcribing") {
+    stepText = "Verifying chunks & transcribing speech (Gemini)...";
+  } else if (data.processing_step === "extracting_tasks") {
+    stepText = "Analyzing transcript & extracting tasks (Gemini)...";
+  } else if (data.processing_step === "completed") {
+    stepText = "Tasks and minutes generated successfully!";
+  } else if (data.processing_step === "failed") {
+    stepText = "Processing failed.";
+  }
+  progressStep.innerText = stepText;
+  
+  // 4. Handle failure details
+  if (data.recording_status === "failed") {
+    const errorBanner = document.getElementById("errorBanner");
+    const errorDetails = document.getElementById("errorDetails");
+    errorDetails.innerText = data.processing_error || "Internal Processing Error";
+    errorBanner.classList.remove("hidden");
+  }
+}
+
+// Reprocess Button Event
 const reprocessBtn = document.getElementById("reprocessBtn");
 if (reprocessBtn) {
   reprocessBtn.onclick = async () => {
@@ -94,16 +216,17 @@ if (reprocessBtn) {
     }
     
     reprocessBtn.disabled = true;
-    reprocessBtn.innerText = "Reprocessing...";
+    reprocessBtn.innerText = "Queuing...";
     reprocessBtn.classList.add("opacity-50", "cursor-not-allowed");
     
     try {
-      const res = await fetch("/api/meetings/{{ meeting_id }}/reprocess", {
+      const res = await fetch(`/api/meetings/${meetingId}/reprocess`, {
         method: "POST"
       });
       
       if (res.ok) {
-        alert("Reprocessing started successfully. Refresh this page after a few minutes.");
+        alert("Reprocessing triggered. Starting task worker.");
+        window.location.reload();
       } else {
         const data = await res.json();
         alert("Reprocessing failed: " + (data.error || "Unknown error"));
@@ -116,6 +239,39 @@ if (reprocessBtn) {
       reprocessBtn.disabled = false;
       reprocessBtn.innerText = "Reprocess Meeting";
       reprocessBtn.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+  };
+}
+
+// Delete Button Event (Soft Delete)
+const deleteBtn = document.getElementById("deleteBtn");
+if (deleteBtn) {
+  deleteBtn.onclick = async () => {
+    if (!confirm("Are you sure you want to delete this meeting? This will permanently delete all associated tasks, storage audio, and generated reports.")) {
+      return;
+    }
+    
+    deleteBtn.disabled = true;
+    deleteBtn.innerText = "Deleting...";
+    
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, {
+        method: "DELETE"
+      });
+      
+      if (res.ok) {
+        alert("Meeting deleted successfully.");
+        window.location.href = "/dashboard";
+      } else {
+        const data = await res.json();
+        alert("Delete failed: " + (data.error || "Unknown error"));
+        deleteBtn.disabled = false;
+        deleteBtn.innerText = "Delete Meeting";
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+      deleteBtn.disabled = false;
+      deleteBtn.innerText = "Delete Meeting";
     }
   };
 }

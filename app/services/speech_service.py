@@ -28,6 +28,9 @@ def transcribe_audio(audio_url):
     print("\n[Speech Service] Starting transcription...")
     print("Audio URL:", audio_url)
 
+    if ffmpeg_path is None:
+        raise Exception("FFmpeg is not installed or not available in PATH")
+
     # ==========================================
     # 1️⃣ DOWNLOAD AUDIO
     # ==========================================
@@ -60,9 +63,11 @@ def transcribe_audio(audio_url):
         try:
             threshold = current_app.config.get("TRANSCRIBE_CHUNK_THRESHOLD_SEC", 600)
             chunk_size_sec = current_app.config.get("TRANSCRIBE_CHUNK_SIZE_SEC", 300)
+            max_chunk_count = current_app.config.get("MAX_CHUNK_COUNT", 48)
         except:
             threshold = getattr(Config, "TRANSCRIBE_CHUNK_THRESHOLD_SEC", 600)
             chunk_size_sec = getattr(Config, "TRANSCRIBE_CHUNK_SIZE_SEC", 300)
+            max_chunk_count = getattr(Config, "MAX_CHUNK_COUNT", 48)
 
         # Gemini Client
         gemini_key = os.getenv("GEMINI_API_KEY")
@@ -80,6 +85,10 @@ def transcribe_audio(audio_url):
         else:
             chunks = [audio]
             print("Audio within threshold. Processing as a single chunk.")
+
+        # Cost/Quota Safeguard: Verify chunk count does not exceed limit before starting transcription
+        if len(chunks) > max_chunk_count:
+            raise Exception(f"Audio chunk count ({len(chunks)}) exceeds the maximum allowed limit of {max_chunk_count} chunks.")
 
         completed_chunks = []
 
